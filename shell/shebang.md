@@ -1,10 +1,8 @@
-# Shell 脚本实践
+# shebang - #！
 
-最后更新时间：`2017-03-13`
+最后更新时间：`2017-03-19`
 
 标签：`Linux` `Unix` `Shell` `Bash`
-
-## shebang - #！
 
 写脚本的时候通常会在脚本的开头加上 [shebang](https://en.wikipedia.org/wiki/Shebang_(Unix)) ，系统会将这段内容作为解释器指令，比如 bash shell 脚本
 
@@ -27,7 +25,7 @@ HaHa
 
 关于 shebang，讨论最多的应该是 **兼容性** 和 **版本控制** 问题。
 
-### 兼容性
+## 兼容性
 
 Linux 和 Unix 在存放解释器的具体路径不太一致，比如 Linux 会放到 `/usr/bin/` 中，而 openBSD 会放到 `/usr/local/bin/` 中。
 
@@ -50,7 +48,7 @@ echo "HaHa"
 虽然办法比较 tricky，但是这种方式能解决脚本解释器的兼容性问题。
 
 
-### 版本控制
+## 版本控制
 
 `env` 会在用户配置的 `PATH` 中查找解释器第一次出现的具体路径。
 
@@ -61,7 +59,7 @@ echo "HaHa"
 
 所以有些人坚持不用 `/usr/bin/env cmd` 这种方式。
 
-### 思考
+## 思考
 
 从部署的角度看，线上机器的环境都是一致的，而且都是通过自动化脚本去安装各种依赖。
 
