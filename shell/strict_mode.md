@@ -176,8 +176,10 @@ echo "${str}"
 ```
 [root@localhost ~]# cat example
 #!/usr/bin/env bash
+# exit immediately if non-zero exit code/unset variable/pipe error
 set -euo pipefail
 
+# loosen up
 set +o pipefail
 str=$(cat /dev/urandom | tr -dc '0-9A-Za-z' | head -c 64)
 set -o pipefail
@@ -293,6 +295,3 @@ fi
 这就代表着脚本的程序设计必须要考虑返回正确的 Exit Code，这样 `set -euo pipefail` 才能让脚本变得更加可控。
 
 > 关于 `set` 更多的内容，请前往 [Link](https://www.gnu.org/software/bash/manual/bashref.html#The-Set-Builtin) 。
-
-
-
