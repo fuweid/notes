@@ -15,7 +15,7 @@ An interface type is defined as a set of method signatures.
 
 * What is interface?
 
-Support polymorphism with [[][Duck Typing]]
+Support polymorphism with [[https://en.wikipedia.org/wiki/Duck_typing][Duck Typing]]
 
 - Dynamic typing
 - Reflection
