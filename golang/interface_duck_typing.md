@@ -1,5 +1,9 @@
 # interface & Duck Typing
 
+最后更新时间：`2017-06-05`
+
+标签：`Golang` `Interface` `Duck Typing`
+
 Go 不需要像 Java 那样显式地使用 **implement** 说明某一数据类型实现了 interface，只要某一数据类型实现了 interface 所定义的方法名签，那么就称该数据类型实现了 interface。interface 的语言特性可以容易地做到接口定义和具体实现解耦分离，并将注意力转移到如何使用 interface ，而不是方法的具体实现，我们也称这种程序设计为 Duck Typing。文本将描述 Go 是如何通过 interface 来实现 Duck Typing。
 
 > 本文提供的源代码都是基于 go1.7rc6 版本。
