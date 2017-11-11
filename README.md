@@ -8,6 +8,8 @@
   - [让你的 shell 脚本变得可控](shell/strict_mode.md)
 * Golang
   - [interface & Duck typing](golang/interface_duck_typing.md)
+* Encoding
+  - [Protobuf 3.0 - 编码](encoding/protobuf_3.md)
 
 # License
 
