@@ -216,3 +216,100 @@ Protobuf Message 是一系列的 Key-Value，第一个字节应属于 Key 。
   => 1001 0110
   => 128 + 16 + 4 + 2 = 150
 ```
+
+## 4. Wire Type
+
+### 4.1 Varint - sint32/sint64
+
+对于负数而言，前序比特 1 不能带来压缩上效益，所以 Protobuf 提供了 `sint32`，`sint64` 类型来使用 `Zig-Zag` 来提高压缩效益。
+
+### 4.2 32-bit / 64-bit
+
+这两部分的 wire type 使用固定长度去传输数据，`64-bit` 采用 8 字节传输，而 `32-bit` 采用 4 字节传输。
+
+### 4.3 Length-delimited
+
+wire type 为 2 的 Length-delimited 会引入长度来辅助解析，其中长度值的编码采用 Varints 。
+
+#### 4.3.1 strings/bytes
+
+```
+message SimpleString {
+   string o_string = 1;
+}
+```
+
+将 `o_string` 设置成 `Hello, world!`，会得到以下数据。
+
+```
+0A 0D 48 65 6C 6C 6F 2C 20 77 6F 72 6C 64 21
+```
+
+Key `0A` 可以推断出 field number 为 1，wire type 为 2。`0D` 解码之后为 13 ，后序 13 个字节将代表 `o_string`。
+
+#### 4.3.2 embedded messages
+
+```
+message SimpleEmbedded {
+  Simple o_embedded = 1; 
+}
+```
+
+将 `o_embedded.o_int64` 设置成 150，会得到以下数据。
+
+```
+0A 04 80 01 96 01
+```
+
+Key `0A` 可以推断出 field number 为 1，wire type 为 2。`04` 解码之后为 4 ，后序 4 个字节将代表 `o_embedded`。整个过程基本和 SimpleString 一致，只不过 `o_embedded` 还需要进一步的解码。
+
+#### 4.3.3 packaed repeated fields
+
+Protobuf 3.0 对于 repeated field 默认都采用了 packed 的形式。在介绍 packed 特性前，有必要说明一下 unpacked 的编码结构。
+
+```
+message SimpleInt64 {
+	int64 o_int64 = 1;
+}
+
+message SimpleUnpacked {
+   repeated int64 o_ids = 1 [packed = false];
+}
+
+message SimplePacked {
+  repeated int64 o_ids = 1;
+}
+```
+
+将 `SimpleUnpacked.o_ids` 设置成 `1,2` 数组，会得到以下数据。Protobuf 编码 unpacked repeated fields 时，并不会将 repeated fields 看成是一个整体，而是单独编码每一个元素。
+
+在解码 unpacked repeated fileds 时，需要将相同 field number 的数据合并到一起。从另外一个角度看，Protobuf 允许将相同 Key 的数据合并到一起。
+
+`08 01 08 02` 数据可以看成是 `SimpleInt64.o_int64 = 1` 和 `SimpleInt64.o_int64 = 2` 编码结果的合并。
+
+```
+08 01 08 02
+
+08 // field number = 1, wire type = 0
+01 // value = 1 
+08 // field number = 1, wire type = 0
+02 // value = 2
+```
+
+同样将 `SimplePacked.o_ids` 设置成 `1,2` 数组，但得到不同的数据。packed repeated fields 在编码时会将其 `o_ids` 看成是一个整体。
+
+```
+0A 02 01 02
+
+0A // field number = 1, wire type = 2
+02 // payload size = 2
+01 // first elem = 1
+02 // second elem = 2
+```
+
+Protobuf 3.0 packed 的行为仅仅支持基础数据类型，即 `Varint/64-bit/32-bit` 三种 wire type。packed 和 unpacked 编码面对长度为 0 的数据时，它并不会输出任何二进制数据。
+
+> 个人认为，基础数据类型所占用字节数少，整体字节数相对可控，引入 payload size 能带来压缩效益。
+> 
+> 一旦使用 embedded message 之后，每一个元素的大小将不可控，可能只有少量元素，但是整体字节数将会很大，payload size 需要大量的字节表示。面对这种场景，unpacked repeated fields 单独编码的方式会带来压缩效益，即使包含了重复的 Key 信息。
+
