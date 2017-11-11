@@ -155,3 +155,64 @@ n & 1 == 1:
 ### 2.3 小结
 
 Protobuf 在编码负数的时候，它提供了 Zig-Zag 编码的可能，在此基础上在使用 Varints 从而达到压缩的效果。
+
+
+## 3. Message
+
+Protobuf Message 是一系列的 Key-Value 二进制数据流。
+
+
+```
+message Simple {
+  //  [key-xx][value-xx] [key-yy][value-yy] ...
+  //
+  //     _ declared type
+  //    /      _ field name
+  //   /      /     _ field number
+  //  /      /     /
+  int64 o_int64 = 16;
+}
+```
+
+在编码过程中，仅仅使用 **field number** 和 **wire type** 为 Key，而 **declared type** 和 **field name** 会辅助解码来判断数据的具体类型，其中 wire type 有以下几种类型。
+
+| Wire Type     | Meaning          | Used For                                                  |
+| ------------- | :-------------:  | :------------------------------------------------------:  |
+| 0             | Varint           | int32, int64, uint32, uint64, sint32, sint64, bool, enum  |
+| 1             | 64-bit           | fixed64, sfixed64, double                                 |
+| 2             | Length-delimited | string, bytes, embedded messages, packaed repeated fields |
+| 3             | Start Group      | groups (deprecated)                                       |
+| 4             | End Group        | groups (deprecated)                                       |
+| 5             | 32-bit           | fixed32, sfixed64, float                                  |
+
+每一个 Key 都是 `(field number << 3 | wire type)` 的 Varint 编码值。
+
+现在，发送方按照 Simple 的约定发送来以下数据 ，在调用解码方法之前，我们可以做一下人工解码。
+
+```
+80 01 96 01
+```
+
+Protobuf Message 是一系列的 Key-Value，第一个字节应属于 Key 。
+
+由于 `80` 的 MSB 为 1，所以 Key 的数据应为 `80 01`。根据上文的 Varints 分析，我们可以得到 field number 为 16，wire type 为 0， 这符合 Simple 的约定，也说明接下来的数据是一个 Varint 类型的数值。
+
+```
+80 01
+
+1000 0000 0000 0001
+   => 000 0000 ++ 000 0001 (drop the msb and reverse the groups of 7 bits)
+   => 1000 0000
+   => (0001 0000 << 3) | 0
+```
+
+按照同样方式，我们得到 Value 的数据为 `96 01`，经过 Varints 解码后为 150，因此发送方发送了 `o_int64 = 150`的消息给我们。
+
+```
+96 01
+
+1001 0110 0000 0001
+  => 001 0110 ++ 000 0001 (drop the msb and reverse the groups of 7 bits)
+  => 1001 0110
+  => 128 + 16 + 4 + 2 = 150
+```
