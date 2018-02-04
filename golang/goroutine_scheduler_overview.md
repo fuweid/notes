@@ -2,7 +2,7 @@
 
 Goroutine 是 Golang 世界里的 `Lightweight Thread` 。
 
-Golang 在语言层面支持多线程，代码可以通过  `go` 关键字来启动 Goroutine ，调用者不需要关心调用栈的大小，函数上下文等等信息就可以完成并发或者并行操作，一定程度上加快了开发的速度。
+Golang 在语言层面支持多线程，代码可以通过  `go` 关键字来启动 Goroutine ，调用者不需要关心调用栈的大小，函数上下文等等信息就可以完成并发或者并行操作，加快了我们的开发速度。
 分析 Goroutine 调度有利于了解和分析 go binary 的工作状况，所以接下来的内容将分析 `runtime` 中关于 Goroutine 调度的逻辑。
 
 > 以下内容涉及到的代码是基于 [go1.9rc2](https://github.com/golang/go/tree/048c9cfaac) 版本。
@@ -40,7 +40,7 @@ Golang 在语言层面支持多线程，代码可以通过  `go` 关键字来启
 
 ### 1.1 Goroutine
 
- Goroutine 是 Golang 世界里的 `线程` ，同样也是可调度的最小单元。
+ Goroutine 是 Golang 世界里的 `线程` ，同样也是可调度的单元。
 
 ```
 // src/runtime/runtime2.go
@@ -86,9 +86,12 @@ type m struct {
 
 `runtime` 在做调度工作或者和当前 Goroutine 无关的任务时，Golang 会切换调用栈来进行相关的任务，就好像 Linux 的进程进入系统调用时会切换到内核态的调用栈一样，这么做也是为了避免影响到调度以及垃圾回收的扫描。
 
-Machine 一般会调用 [systemstack 函数](https://github.com/golang/go/blob/048c9cfaacb6fe7ac342b0acd8ca8322b6c49508/src/runtime/stubs.go#L39) 来切换调用栈。从名字可以看出，Golang 对外部 go code 的调用栈称之为 `user stack` ，而将运行核心 `runtime` 部分代码的调用栈称之为 `system stack`。Machine 需要维护这两个调用栈的上下文，所以 `m` 中 `g0` 用来代表 `runtime` 内部的代码，而 `curg` 则是我们平时写的代码，更多详情可以关注 [src/runtime/HACKING.md](https://github.com/golang/go/blob/048c9cfaacb6fe7ac342b0acd8ca8322b6c49508/src/runtime/HACKING.md#user-stacks-and-system-stacks).
+Machine 一般会调用 [systemstack 函数](https://github.com/golang/go/blob/048c9cfaacb6fe7ac342b0acd8ca8322b6c49508/src/runtime/stubs.go#L39) 来切换调用栈。
+从名字可以看出，Golang 对外部 go code 的调用栈称之为 `user stack` ，而将运行核心 `runtime` 部分代码的调用栈称之为 `system stack`。
+Machine 需要维护这两个调用栈的上下文，所以 `m` 中 `g0` 用来代表 `runtime` 内部逻辑，而 `curg` 则是我们平时写的代码，更多详情可以关注 [src/runtime/HACKING.md](https://github.com/golang/go/blob/048c9cfaacb6fe7ac342b0acd8ca8322b6c49508/src/runtime/HACKING.md#user-stacks-and-system-stacks).
 
-因为调用栈可以来回地切换，Machine 需要知道当前运行的调用栈信息，所以 Golang 会利用  Thread Local Storage 或者指定寄存器来存储当前运行的 `g`。`settls` 汇编代码会将 `g` 的地址放到 `m.tls` 中，这样 Machine 就可以通过 `getg` 取出当前运行的 Goroutine。
+因为调用栈可以来回地切换，Machine 需要知道当前运行的调用栈信息，所以 Golang 会利用 Thread Local Storage 或者指定寄存器来存储当前运行的 `g`。
+`settls` 汇编代码会将 `g` 的地址放到 `m.tls` 中，这样 Machine 就可以通过 `getg` 取出当前运行的 Goroutine。
 
 > 不同平台 `settls` 的行为有一定差别。
 
@@ -129,7 +132,7 @@ func getg() *g
 #endif
 ```
 
-Machine 想要执行一个 Goroutine，必须要绑定 Processor。
+但是 Machine 想要执行一个 Goroutine，必须要绑定 Processor。
 
 > `runtime` 内部有些函数执行时会直接绑定 Machine，并不需要 Processor，比如 [sysmon](https://github.com/golang/go/blob/048c9cfaacb6fe7ac342b0acd8ca8322b6c49508/src/runtime/proc.go#L3810) 。
 
@@ -156,7 +159,7 @@ type p struct {
 
 Processor 的数目代表着 `runtime` 能同时处理 Goroutine 的数目，`GOMAXPROCS` 环境变量是用来指定 Processor 的数目，默认状态会是 CPU 的个数。
 
-也正是因为 Processor 的存在，`runtime` 并不需要做一个集中式的 Goroutine 调度，每一个 Machine 都会在  Processor 本地队列、Global Runnable Queue 或者是其他 Processor 队列中找 Goroutine 执行，减少全局锁对性能的影响，后面会对此展开说明。
+也正是因为 Processor 的存在，`runtime` 并不需要做一个集中式的 Goroutine 调度，每一个 Machine 都会在 Processor 本地队列、Global Runnable Queue 或者其他 Processor 队列中找 Goroutine 执行，减少全局锁对性能的影响，后面会对此展开说明。
 
 ### 1.4 全局调度信息 sched
 
@@ -270,7 +273,7 @@ newg.gopc = callerpc
 newg.startpc = fn.fn
 ```
 
-> 想了解指令的更多细节，请查看 [Intel® 64 and IA-32 Architectures Developer's Manual: Vol. 1](https://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-software-developer-vol-1-manual.html)。
+> 想了解 Intel 指令的更多细节，请查看 [Intel® 64 and IA-32 Architectures Developer's Manual: Vol. 1](https://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-software-developer-vol-1-manual.html)。
 
 ### 2.2 全局唯一的 goid
 
@@ -299,7 +302,7 @@ newg.goid = int64(_p_.goidcache)
 _p_.goidcache++
 ```
 
-全局调度信息 `sched.goidgen` 专门用来做发号器，Processor 每次可以从发号器那拿走 `_GoidCacheBatch` 个号，然后内部再采用自增的方式来发号，这样就保证了每一个 Goroutine 都可以拥有全局唯一的 `goid`。
+全局调度信息 `sched.goidgen` 是专门用来做发号器，Processor 每次可以从发号器那拿走 `_GoidCacheBatch` 个号，然后内部采用自增的方式来发号，这样就保证了每一个 Goroutine 都可以拥有全局唯一的 `goid`。
 
 > 从全局调度信息那里取号的时候用原子操作来保证并发操作的正确性，而内部发号时却采用非原子操作，这是因为一个 Processor 只能被一个 Machine 绑定上，所以这里 `_p_.goidcache` 自增不需要要原子操作也能保证它的正确性。
 
@@ -307,7 +310,7 @@ _p_.goidcache++
 
 当 Goroutine 创建完毕之后，它是放在当前 Processor 的 Local Runnable Queue 还是全局队列里？
 
-`runqput` 这个函数会尝试把 `newg` 放到本地队列上，如果本地队列满了，它会将本地队列的前半部分和 `newg` 迁移到全局队列中。剩下的事情就等待 Machine 自己去拿任务了。
+[runqput](https://github.com/golang/go/blob/048c9cfaacb6fe7ac342b0acd8ca8322b6c49508/src/runtime/proc.go#L4289) 这个函数会尝试把 `newg` 放到本地队列上，如果本地队列满了，它会将本地队列的前半部分和 `newg` 迁移到全局队列中。剩下的事情就等待 Machine 自己去拿任务了。
 
 ```
 // src/runtime/proc.go @ func newproc1
@@ -403,10 +406,10 @@ TEXT runtime·rt0_go(SB),NOSPLIT,$0
 
 因为在 Golang 的世界里，任务的执行需要 Machine 本身自己去获取。
 每个 Machine 运行前都会绑定一个 Processor，Machine 会逐步消耗完当前 Processor 队列。
-为了防止某些 Machine 没有事情可做，所以 `runtime` 做了两件事：
+为了防止某些 Machine 没有事情可做，某些 Machine 忙死，所以 `runtime` 会做了两件事：
 
 * 当前 Processor 队列已满，Machine 会将本地队列的部分 Goroutine 迁移到 Global Runnable Queue 中;
-* Machine 绑定的 Processor 没有可执行的 Goroutine 时，它会去 Global Runnable Queue、Net Network 和其他 Processor 的队列中抢任务;
+* Machine 绑定的 Processor 没有可执行的 Goroutine 时，它会去 Global Runnable Queue、Net Network 和其他 Processor 的队列中抢任务。
 
 这种调度模式叫做 [Work Stealing](https://en.wikipedia.org/wiki/Work_stealing)。
 
@@ -457,19 +460,19 @@ if atomic.Load(&sched.npidle) != 0 && atomic.Load(&sched.nmspinning) == 0 && run
 }
 ```
 
-当 Machine 找不到可执行的 Goroutine 时，它还会努力地寻找可执行的 Goroutine，这段时间它属于 `spinning` 的状态。
-当它实在是找不到了，它才回释放当前 Processor 进入休眠状态。
+当 Machine 找不到可执行的 Goroutine 时，但是还在努力地寻找可执行的 Goroutine，这段时间它属于 `spinning` 的状态。
+它实在是找不到了，它才回释放当前 Processor 进入休眠状态。
 
 `atomic.Load(&sched.npidle) != 0 && atomic.Load(&sched.nmspinning) == 0` 指的是有空闲的 Processor 而没有 `spinning` 状态的 Machine。
 这个时候可能是有休眠状态的 Machine，可能是程序刚启动的时候并没有足够的 Machine。当遇到这种情况，当前 Machine 会执行 `wakep`，让程序能快速地消化 Goroutine。
 
 > 在初始化过程中，为 `runtime.main` 函数创建的第一个 Goroutine 并不需要调用 `wakep`，所以在该判断条件里 `runtimeInitTime != 0` 会失败。
-> runtimeInitTime 会在 `runtime.main` 函数中被赋值，表明正式开始执行任务啦。
+> [runtimeInitTime](https://github.com/golang/go/blob/048c9cfaacb6fe7ac342b0acd8ca8322b6c49508/src/runtime/proc.go#L123) 会在 `runtime.main` 函数中被赋值，表明正式开始执行任务啦。
 
 `wakep` 首先会查看有没有空闲的 Machine，如果找到而且状态合理，那么就会激活它。如果没有找到，那么会创建一个新的 `spinning` Machine。
 
 在 Golang 世界里，新创建的 Machine 可以认为它属于 `spinning`，因为创建 OS-Thread 有一定代价，一旦创建出来了它就要去干活。
-除此之外，Golang 创建新的线程并不会直接交付任务给它，而是让它调用 `runtime.mstart` 的方法自己去找活做。
+除此之外，Golang 创建新的线程并不会直接交付任务给它，而是让它调用 `runtime.mstart` 方法自己去找活做。
 
 
 ```
@@ -526,7 +529,7 @@ func startm(_p_ *p, spinning bool) {
 
 ## 5. Preemptive
 
-Machine 会在全局范围内查找 Goroutine 来执行，似乎还缺少角色去通知 Machine 释放当前 Goroutine。
+Machine 会在全局范围内查找 Goroutine 来执行，似乎还缺少角色去通知 Machine 释放当前 Goroutine，总不能执行完毕再切换吧。
 我们知道操作系统会根据时钟周期性地触发系统中断来进行调度，Golang 是用户态的线程调度，那它怎么通知 Machine 呢？
 
 回忆上文, 提到了有些 Machine 执行任务前它并不需要绑定 Processor，它们都做什么任务呢？
@@ -779,7 +782,42 @@ SCHED 36150ms: gomaxprocs=4 idleprocs=4 threads=403 spinningthreads=0 idlethread
 SCHED 37155ms: gomaxprocs=4 idleprocs=4 threads=403 spinningthreads=0 idlethreads=400 runqueue=0 [0 0 0 0]
 ```
 
-压力测试完毕之后，创建的线程明显比 `localhost:8080/echo` 多不少。这是 Golang 在进行系统调用时会做一些处理。
+压力测试完毕之后，创建的线程明显比 `localhost:8080/echo` 多不少。在压测过程中采用 `gdb attach` + `thread apply all bt` 查看这些线程都在做什么:
+
+```
+...
+Thread 152 (Thread 0x7f4744fb1700 (LWP 27863)):
+#0  syscall.Syscall () at /usr/local/go/src/syscall/asm_linux_amd64.s:27
+#1  0x000000000047151f in syscall.Nanosleep (time=0xc42119ac90,
+#2  0x000000000060f042 in main.main.func1 (w=..., r=0xc4218d8900)
+#3  0x00000000005e8974 in net/http.HandlerFunc.ServeHTTP (f=
+#4  0x00000000005ea020 in net/http.(*ServeMux).ServeHTTP (
+#5  0x00000000005eafa4 in net/http.serverHandler.ServeHTTP (sh=..., rw=...,
+#6  0x00000000005e7a5d in net/http.(*conn).serve (c=0xc420263360, ctx=...)
+#7  0x0000000000458e31 in runtime.goexit ()
+#8  0x000000c420263360 in ?? ()
+#9  0x00000000007cf100 in crypto/elliptic.p224ZeroModP63 ()
+#10 0x000000c421180ec0 in ?? ()
+#11 0x0000000000000000 in ?? ()
+Thread 151 (Thread 0x7f47457b2700 (LWP 27862)):
+#0  syscall.Syscall () at /usr/local/go/src/syscall/asm_linux_amd64.s:27
+#1  0x000000000047151f in syscall.Nanosleep (time=0xc4206bcc90,
+#2  0x000000000060f042 in main.main.func1 (w=..., r=0xc4218cd300)
+#3  0x00000000005e8974 in net/http.HandlerFunc.ServeHTTP (f=
+#4  0x00000000005ea020 in net/http.(*ServeMux).ServeHTTP (
+#5  0x00000000005eafa4 in net/http.serverHandler.ServeHTTP (sh=..., rw=...,
+#6  0x00000000005e7a5d in net/http.(*conn).serve (c=0xc42048afa0, ctx=...)
+#7  0x0000000000458e31 in runtime.goexit ()
+#8  0x000000c42048afa0 in ?? ()
+#9  0x00000000007cf100 in crypto/elliptic.p224ZeroModP63 ()
+#10 0x000000c4204fd080 in ?? ()
+#11 0x0000000000000000 in ?? ()
+...
+```
+
+> Red Hat 系列的机器可以直接使用 `pstack` 去 Dump 当前主进程内部的调用栈情况，可惜 Ubuntu 64 Bit 没有这样的包，只能自己写一个脚本去调用 `gdb` 来 Dump。
+
+截取两个线程的调用栈信息，发现它们都在休眠状态，几乎都卡在 `/usr/local/go/src/syscall/asm_linux_amd64.s` 上。如果都阻塞了，那么它是怎么处理新来的请求？
 
 ```
 // src/syscall/asm_linux_amd64.s
