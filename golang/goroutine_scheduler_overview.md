@@ -867,7 +867,8 @@ func checkmcount() {
 }
 ```
 
-当 Machine 从内核态回来之后，会进入 `runtime.exitsyscall`，如果执行时间很短，它会尝试地夺回之前的 Processor 或者是绑定上空闲的 Processor，一旦绑定上了 Processor ，它便会继续运行当前的 Goroutine。
+当 Machine 从内核态回来之后，会进入 `runtime.exitsyscall`。
+如果执行时间很短，它会尝试地夺回之前的 Processor ；或者是尝试绑定空闲的 Processor，一旦绑定上了 Processor ，它便会继续运行当前的 Goroutine。
 如果都失败了，Machine 因为没有可绑定的 Processor 而将当前的 Goroutine 放回到全局队列中，将自己进入休眠状态，等待其他 Machine 来唤醒。
 
 一般情况下，go binary 不会创建特别多的线程，但是上线的代码还是需要做一下压测，了解一下代码的实际情况。
